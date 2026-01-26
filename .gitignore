@@ -1,0 +1,54 @@
+# Extension
+extension/video.*
+.build
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# Scripts & lint
+deploy_github.sh
+lint_check.sh
+
+# Build artifacts
+gschemas.compiled
+*.zip
+*.tar.gz
+.lint-output.txt
+.lint-passed
+
+# Dependencies directories
+node_modules/
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# yarn v2
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+.pnp.*
+
+# Translation binaries
+*.mo
+
+# OS generated files
+.DS_Store
+Thumbs.db
+*~
+
+# VSCode
+.vscode
+
+# Backups
+*.backup*
+*.bak

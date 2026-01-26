@@ -1,0 +1,17 @@
+{
+  "allowed_files": [
+    "extension.js",
+    "prefs.js",
+    "metadata.json",
+    "schemas/org.gnome.shell.extensions.brightness-restore.gschema.xml",
+    "library/constants.js",
+    "library/label.js",
+    "library/logger.js",
+    "library/settings.js",
+    "library/utils.js"
+  ],
+  "allowed_directories": [
+    "schemas",
+    "library"
+  ]
+}

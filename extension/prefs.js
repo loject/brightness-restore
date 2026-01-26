@@ -1,0 +1,419 @@
+'use strict';
+
+import Gio from 'gi://Gio';
+import Gtk from 'gi://Gtk';
+import Adw from 'gi://Adw';
+
+import { ExtensionPreferences, gettext as _ } from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
+
+const BUILD_DATE = '2026-01-26T20:44:34.084Z';
+const CHANGELOG = `
+INITIAL RELEASE
+
+BRIGHTNESS RESTORE
+
+Persistence: Automatically remembers visual brightness level across reboots.
+
+Architecture: Syncs directly with Gnome Shell's brightnessManager.
+
+UI: Simple panel indicator with position control.
+
+Settings: Refactored "Beautiful" settings menu with Debug/Logging capabilities.`;
+
+export default class BrightnessRestorePreferences extends ExtensionPreferences {
+    _switchToNavigationSplitViews(window) {
+        // Add dummy Adw.PreferencesPage to avoid logs spamming
+        const dummyPrefsPage = new Adw.PreferencesPage();
+        window.add(dummyPrefsPage);
+
+        // Add AdwNavigationSplitView and componenents
+        const splitView = new Adw.NavigationSplitView({
+            hexpand: true,
+            vexpand: true,
+            sidebar_width_fraction: 0.3,
+        });
+        const breakpointBin = new Adw.BreakpointBin({
+            width_request: 100,
+            height_request: 100,
+        });
+        const breakpoint = new Adw.Breakpoint();
+        breakpoint.set_condition(Adw.BreakpointCondition.parse('max-width: 600px'));
+        breakpoint.add_setter(splitView, 'collapsed', true);
+        breakpointBin.add_breakpoint(breakpoint);
+        breakpointBin.set_child(splitView);
+        window.set_content(breakpointBin);
+
+        // AdwNavigationSplitView Sidebar configuration
+        const splitViewSidebar = new Adw.NavigationPage({
+            title: _('Settings'),
+        });
+        const sidebarToolbar = new Adw.ToolbarView();
+        const sidebarHeader = new Adw.HeaderBar();
+        const sidebarBin = new Adw.Bin();
+        this._sidebarListBox = new Gtk.ListBox();
+        this._sidebarListBox.add_css_class('navigation-sidebar');
+        sidebarBin.set_child(this._sidebarListBox);
+        sidebarToolbar.set_content(sidebarBin);
+        sidebarToolbar.add_top_bar(sidebarHeader);
+        splitViewSidebar.set_child(sidebarToolbar);
+        splitView.set_sidebar(splitViewSidebar);
+
+        // Content configuration
+        const splitViewContent = new Adw.NavigationPage();
+        this._contentToastOverlay = new Adw.ToastOverlay();
+        const contentToolbar = new Adw.ToolbarView();
+        const contentHeader = new Adw.HeaderBar();
+        const stack = new Gtk.Stack({
+            transition_type: Gtk.StackTransitionType.CROSSFADE,
+        });
+        contentToolbar.set_content(stack);
+        contentToolbar.add_top_bar(contentHeader);
+        this._contentToastOverlay.set_child(contentToolbar);
+        splitViewContent.set_child(this._contentToastOverlay);
+        splitView.set_content(splitViewContent);
+
+        this._firstPageAdded = false;
+        this._addPage = page => {
+            const row = new Gtk.ListBoxRow();
+            row._name = page.get_name ? page.get_name() : 'page';
+            row._title = page.get_title();
+            row._id = (row._title || 'id').toLowerCase().replace(/\s+/g, '-');
+            const rowIcon = new Gtk.Image({ icon_name: page.get_icon_name() });
+            const rowLabel = new Gtk.Label({ label: row._title, xalign: 0 });
+            const box = new Gtk.Box({
+                spacing: 12,
+                margin_top: 12,
+                margin_bottom: 12,
+                margin_start: 12,
+                margin_end: 12,
+            });
+            box.append(rowIcon);
+            box.append(rowLabel);
+            row.set_child(box);
+            row.set_activatable(true);
+            stack.add_named(page, row._id);
+            this._sidebarListBox.append(row);
+
+            if (!this._firstPageAdded) {
+                splitViewContent.set_title(row._title);
+                this._firstPageAdded = true;
+            }
+        };
+
+        this._sidebarListBox.connect('row-activated', (listBox, row) => {
+            if (!row) return;
+            splitView.set_show_content(true);
+            splitViewContent.set_title(row._title);
+            stack.set_visible_child_name(row._id);
+        });
+    }
+
+    fillPreferencesWindow(window) {
+        const settings = this.getSettings();
+
+        // Setup custom sidebar layout
+        window.set_default_size(900, 700);
+        this._switchToNavigationSplitViews(window);
+
+        // Helper to add icon to row
+        const addIcon = (row, iconName) => {
+            const icon = new Gtk.Image({
+                icon_name: iconName,
+            });
+            row.add_prefix(icon);
+        };
+
+        // === PAGE 1: GENERAL ===
+        const generalPage = new Adw.PreferencesPage({
+            title: _('General'),
+            icon_name: 'preferences-system-symbolic',
+        });
+
+        // Group: Persistence
+        const behaviorGroup = new Adw.PreferencesGroup({
+            title: _('Behavior'),
+        });
+
+        const restoreRow = new Adw.ActionRow({
+            title: _('Restore on Startup'),
+            subtitle: _('Apply last saved brightness when logging in'),
+        });
+        addIcon(restoreRow, 'view-refresh-symbolic');
+        const restoreSwitch = new Gtk.Switch({
+            active: settings.get_boolean('restore-on-startup'),
+            valign: Gtk.Align.CENTER,
+        });
+        settings.bind('restore-on-startup', restoreSwitch, 'active', Gio.SettingsBindFlags.DEFAULT);
+        restoreRow.add_suffix(restoreSwitch);
+        behaviorGroup.add(restoreRow);
+
+        const intervalRow = new Adw.ActionRow({
+            title: _('Update Interval (seconds)'),
+            subtitle: _('Interval to debounce saving brightness'),
+        });
+        addIcon(intervalRow, 'preferences-system-time-symbolic');
+        const intervalSpin = new Gtk.SpinButton({
+            adjustment: new Gtk.Adjustment({ lower: 1, upper: 60, step_increment: 1 }),
+            valign: Gtk.Align.CENTER,
+        });
+        settings.bind('interval', intervalSpin, 'value', Gio.SettingsBindFlags.DEFAULT);
+        intervalRow.add_suffix(intervalSpin);
+        behaviorGroup.add(intervalRow);
+
+        generalPage.add(behaviorGroup);
+
+        // === PAGE 2: APPEARANCE (Brightness) ===
+        const appearancePage = new Adw.PreferencesPage({
+            title: _('Appearance'),
+            icon_name: 'preferences-desktop-display-symbolic',
+        });
+
+        const visualGroup = new Adw.PreferencesGroup({
+            title: _('Panel Indicator'),
+        });
+
+        const positionRow = new Adw.ActionRow({
+            title: _('Indicator Position'),
+            subtitle: _('Where to place the brightness percentage in Quick Settings'),
+        });
+        addIcon(positionRow, 'view-grid-symbolic'); // Monitor/Grid icon
+        const positionModel = Gtk.StringList.new([_('left'), _('right'), _('default')]);
+        const positionDropDown = new Gtk.DropDown({
+            valign: Gtk.Align.CENTER,
+            model: positionModel,
+        });
+
+        // Map string to index
+        const currentPos = settings.get_string('indicator-position');
+        const map = { left: 0, right: 1, default: 2 };
+        positionDropDown.set_selected(map[currentPos] || 1);
+
+        positionDropDown.connect('notify::selected', widget => {
+            const idx = widget.get_selected();
+            const val = ['left', 'right', 'default'][idx];
+            settings.set_string('indicator-position', val);
+        });
+        positionRow.add_suffix(positionDropDown);
+        visualGroup.add(positionRow);
+
+        appearancePage.add(visualGroup);
+
+        // Manual Control Group
+        const controlGroup = new Adw.PreferencesGroup({
+            title: _('Control'),
+            description: _('Manually adjust system brightness.'),
+        });
+
+        const sliderRow = new Adw.ActionRow({
+            title: _('Brightness Level'),
+        });
+        const scale = new Gtk.Scale({
+            orientation: Gtk.Orientation.HORIZONTAL,
+            adjustment: new Gtk.Adjustment({ lower: 0, upper: 100, step_increment: 1, page_increment: 10 }),
+            hexpand: true,
+            draw_value: true,
+            value_pos: Gtk.PositionType.RIGHT,
+        });
+
+        const adjustScaleBy = delta => {
+            const current = scale.get_value();
+            const next = Math.max(0, Math.min(100, current + delta));
+            if (Math.abs(next - current) > 0.01) scale.set_value(next);
+        };
+
+        const minusButton = new Gtk.Button({
+            label: '-',
+            valign: Gtk.Align.CENTER,
+            tooltip_text: _('Decrease brightness'),
+        });
+        minusButton.connect('clicked', () => adjustScaleBy(-5));
+
+        const plusButton = new Gtk.Button({
+            label: '+',
+            valign: Gtk.Align.CENTER,
+            tooltip_text: _('Increase brightness'),
+        });
+        plusButton.connect('clicked', () => adjustScaleBy(5));
+
+        // Current Value
+        scale.set_value(settings.get_double('last-brightness') * 100);
+
+        // Bind? GSettings stores double 0.0-1.0, Scale works 0-100 or 0-1.
+        // GSettingsBindFlags.DEFAULT does plain mapping.
+        // We'll manual connect to do the conversion safely.
+
+        scale.connect('value-changed', () => {
+            const val = scale.get_value() / 100.0;
+            settings.set_double('last-brightness', val);
+        });
+
+        // Listen for external updates (e.g. from extension)
+        settings.connect('changed::last-brightness', () => {
+            const val = settings.get_double('last-brightness');
+            // block signal? or just set_value. set_value triggers value-changed again?
+            // Usually GtkScale guards, but let's be safe.
+            const currentUI = scale.get_value() / 100.0;
+            if (Math.abs(currentUI - val) > 0.01) {
+                scale.set_value(val * 100);
+            }
+        });
+
+        sliderRow.add_suffix(minusButton);
+        sliderRow.add_suffix(scale);
+        sliderRow.add_suffix(plusButton);
+        controlGroup.add(sliderRow);
+        appearancePage.add(controlGroup);
+
+        // === PAGE 3: DEBUG ===
+        const debugPage = new Adw.PreferencesPage({
+            title: _('Debug'),
+            icon_name: 'applications-engineering-symbolic',
+        });
+
+        // Advanced Group (Switch)
+        const advancedGroup = new Adw.PreferencesGroup({ title: _('Advanced') });
+        const debugRow = new Adw.ActionRow({
+            title: _('Enable Debug Mode'),
+            subtitle: _('Enable verbose logging'),
+        });
+        addIcon(debugRow, 'utilities-terminal-symbolic');
+        const debugSwitch = new Gtk.Switch({
+            active: settings.get_boolean('debug'),
+            valign: Gtk.Align.CENTER,
+        });
+        settings.bind('debug', debugSwitch, 'active', Gio.SettingsBindFlags.DEFAULT);
+        debugRow.add_suffix(debugSwitch);
+        advancedGroup.add(debugRow);
+        debugPage.add(advancedGroup);
+
+        // Logging Group (Details)
+        const loggingGroup = new Adw.PreferencesGroup({ title: _('Logging') });
+
+        const logLevelRow = new Adw.ActionRow({ title: _('Log Level') });
+        addIcon(logLevelRow, 'view-list-symbolic');
+        const logLevelModel = Gtk.StringList.new([_('Verbose'), _('Debug'), _('Info'), _('Warn'), _('Error')]);
+        const logLevelDropDown = new Gtk.DropDown({
+            valign: Gtk.Align.CENTER,
+            model: logLevelModel,
+        });
+        logLevelDropDown.set_selected(settings.get_int('loglevel'));
+        logLevelDropDown.connect('notify::selected', widget => {
+            settings.set_int('loglevel', widget.get_selected());
+        });
+        logLevelRow.add_suffix(logLevelDropDown);
+        loggingGroup.add(logLevelRow);
+
+        const logToFileRow = new Adw.ActionRow({ title: _('Save Logs to File') });
+        addIcon(logToFileRow, 'document-save-symbolic');
+        const logToFileSwitch = new Gtk.Switch({
+            active: settings.get_boolean('logtofile'),
+            valign: Gtk.Align.CENTER,
+        });
+        settings.bind('logtofile', logToFileSwitch, 'active', Gio.SettingsBindFlags.DEFAULT);
+        logToFileRow.add_suffix(logToFileSwitch);
+        loggingGroup.add(logToFileRow);
+
+        const logPathRow = new Adw.ActionRow({
+            title: _('Log File Path'),
+            subtitle: _('Default: Cache Directory'),
+        });
+        addIcon(logPathRow, 'folder-symbolic');
+        const logPathEntry = new Gtk.Entry({
+            text: settings.get_string('logfilepath'),
+            valign: Gtk.Align.CENTER,
+        });
+        logPathEntry.connect('changed', () => settings.set_string('logfilepath', logPathEntry.get_text()));
+        logPathRow.add_suffix(logPathEntry);
+        loggingGroup.add(logPathRow);
+
+        debugPage.add(loggingGroup);
+
+        // Visibility Logic for Debug
+        const updateDebugVisibility = () => {
+            const isDebug = settings.get_boolean('debug');
+            loggingGroup.visible = isDebug;
+            logPathRow.visible = isDebug && settings.get_boolean('logtofile');
+        };
+        settings.connect('changed::debug', updateDebugVisibility);
+        settings.connect('changed::logtofile', updateDebugVisibility);
+        updateDebugVisibility();
+
+        // === PAGE 4: CHANGELOG ===
+        const changelogPage = new Adw.PreferencesPage({
+            title: _('Changelog'),
+            icon_name: 'x-office-document-symbolic',
+        });
+        const changelogGroup = new Adw.PreferencesGroup({
+            title: _(`Latest Changes`),
+        });
+        const changelogLabel = new Gtk.Label({
+            label: CHANGELOG,
+            wrap: true,
+            xalign: 0,
+            selectable: true,
+            margin_top: 24,
+            margin_bottom: 24,
+            margin_start: 12,
+            margin_end: 12,
+        });
+        changelogGroup.add(changelogLabel);
+        changelogPage.add(changelogGroup);
+
+        // === PAGE 5: ABOUT ===
+        const aboutPage = new Adw.PreferencesPage({
+            title: _('About'),
+            icon_name: 'help-about-symbolic',
+        });
+        const versionName = this.metadata['version-name'] ?? this.metadata.version ?? 'Unknown';
+        const projectGroup = new Adw.PreferencesGroup({
+            title: _('Project Information'),
+            description: _(`Version: ${versionName}`),
+        });
+
+        // Dynamic update for Build Date
+        const updateAboutInfo = () => {
+            let descriptionText = `Version: ${versionName}`;
+            if (settings.get_boolean('debug')) {
+                descriptionText += `\nBuild Date: ${BUILD_DATE}`;
+            }
+            projectGroup.set_description(_(descriptionText));
+        };
+        settings.connect('changed::debug', updateAboutInfo);
+        updateAboutInfo();
+
+        const linkRow = new Adw.ActionRow({
+            title: _('Project Homepage'),
+            subtitle: 'https://github.com/DarkPhilosophy/brightness-restore',
+        });
+        addIcon(linkRow, 'web-browser-symbolic');
+        const linkButton = new Gtk.LinkButton({
+            uri: 'https://github.com/DarkPhilosophy/brightness-restore',
+            icon_name: 'external-link-symbolic',
+            valign: Gtk.Align.CENTER,
+        });
+        linkRow.add_suffix(linkButton);
+        projectGroup.add(linkRow);
+
+        const reportRow = new Adw.ActionRow({
+            title: _('Report an Issue'),
+            subtitle: _('Found a bug? Let us know!'),
+        });
+        addIcon(reportRow, 'tools-check-spelling-symbolic');
+        const reportButton = new Gtk.LinkButton({
+            uri: 'https://github.com/DarkPhilosophy/brightness-restore/issues',
+            icon_name: 'external-link-symbolic',
+            valign: Gtk.Align.CENTER,
+        });
+        reportRow.add_suffix(reportButton);
+        projectGroup.add(reportRow);
+
+        aboutPage.add(projectGroup);
+
+        // Add pages to window
+        this._addPage(generalPage);
+        this._addPage(appearancePage);
+        this._addPage(debugPage);
+        this._addPage(changelogPage);
+        this._addPage(aboutPage);
+    }
+}

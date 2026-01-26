@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist gettext-domain="brightness-restore">
+  <schema id="org.gnome.shell.extensions.brightness-restore" path="/org/gnome/shell/extensions/brightness-restore/">
+    <key name="last-brightness" type="d">
+      <default>-1.0</default>
+      <summary>Last saved brightness level</summary>
+      <description>The last known brightness value (0.0 to 1.0). -1.0 means unset.</description>
+    </key>
+    <key name="restore-on-startup" type="b">
+      <default>true</default>
+      <summary>Restore brightness on login</summary>
+      <description>Whether to apply the last saved brightness when the extension loads.</description>
+    </key>
+    <key name="indicator-position" type="s">
+      <default>'right'</default>
+      <summary>Indicator Position</summary>
+      <description>Where to place the indicator: 'left', 'right', or 'default'.</description>
+    </key>
+    <key name="interval" type="i">
+      <default>2</default>
+      <summary>Update interval</summary>
+    </key>
+    <key name="debug" type="b">
+      <default>false</default>
+      <summary>Enable Debug Mode</summary>
+    </key>
+    <key name="loglevel" type="i">
+      <default>1</default>
+      <summary>Log Level</summary>
+      <description>0=Verbose, 1=Debug, 2=Info, 3=Warn, 4=Error</description>
+    </key>
+    <key name="logtofile" type="b">
+      <default>true</default>
+      <summary>Log to File</summary>
+    </key>
+    <key name="logfilepath" type="s">
+      <default>''</default>
+      <summary>Log File Path</summary>
+    </key>
+  </schema>
+</schemalist>
