@@ -4,14 +4,15 @@
     "prefs.js",
     "metadata.json",
     "schemas/org.gnome.shell.extensions.brightness-restore.gschema.xml",
-    "library/constants.js",
     "library/label.js",
     "library/logger.js",
     "library/settings.js",
-    "library/utils.js"
+    "library/indicators/panel.js",
+    "library/indicators/quick-settings.js"
   ],
   "allowed_directories": [
     "schemas",
-    "library"
+    "library",
+    "library/indicators"
   ]
 }

@@ -6,19 +6,39 @@ import Adw from 'gi://Adw';
 
 import { ExtensionPreferences, gettext as _ } from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
 
-const BUILD_DATE = '2026-01-26T22:16:41.208Z';
+const BUILD_DATE = '2026-01-28T10:40:30.290Z';
 const CHANGELOG = `
-INITIAL RELEASE
+DUAL MODES & ROBUSTNESS
 
-BRIGHTNESS RESTORE
+Major Update: Flexible UI & Robust Hardware Support
 
-Persistence: Automatically remembers visual brightness level across reboots.
+Dual UI Modes:
 
-Architecture: Syncs directly with Gnome Shell's brightnessManager.
+Quick Settings (Default): Integrated seamlessly into the status area pill (no slider, clean look).
 
-UI: Simple panel indicator with position control.
+Standalone: Classic panel button with slider menu for direct control.
 
-Settings: Refactored "Beautiful" settings menu with Debug/Logging capabilities.`;
+Hybrid Hardware/Software Control:
+
+Prioritizes org.gnome.SettingsDaemon.Power (DBus) for hardware control.
+
+Automatically falls back to Main.brightnessManager (Software) if hardware is unavailable.
+
+Preferences Refinement:
+
+Reordered settings for better usability.
+
+Conditional visibility for position settings based on selected style.
+
+Conditional Watchdog:
+
+Background monitoring process now only runs when "Debug Mode" is enabled.
+
+Robustness: Fixed linting issues and duplicate code paths.
+
+Cleanup: Removed unused artifacts and legacy battery/power components.
+
+Refactor: Split monolithic UI logic into focused indicator modules for maintainability.`;
 
 export default class BrightnessRestorePreferences extends ExtensionPreferences {
     _switchToNavigationSplitViews(window) {
@@ -50,9 +70,9 @@ export default class BrightnessRestorePreferences extends ExtensionPreferences {
         const sidebarToolbar = new Adw.ToolbarView();
         const sidebarHeader = new Adw.HeaderBar();
         const sidebarBin = new Adw.Bin();
-        this._sidebarListBox = new Gtk.ListBox();
-        this._sidebarListBox.add_css_class('navigation-sidebar');
-        sidebarBin.set_child(this._sidebarListBox);
+        const sidebarListBox = new Gtk.ListBox();
+        sidebarListBox.add_css_class('navigation-sidebar');
+        sidebarBin.set_child(sidebarListBox);
         sidebarToolbar.set_content(sidebarBin);
         sidebarToolbar.add_top_bar(sidebarHeader);
         splitViewSidebar.set_child(sidebarToolbar);
@@ -60,7 +80,7 @@ export default class BrightnessRestorePreferences extends ExtensionPreferences {
 
         // Content configuration
         const splitViewContent = new Adw.NavigationPage();
-        this._contentToastOverlay = new Adw.ToastOverlay();
+        const contentToastOverlay = new Adw.ToastOverlay();
         const contentToolbar = new Adw.ToolbarView();
         const contentHeader = new Adw.HeaderBar();
         const stack = new Gtk.Stack({
@@ -68,12 +88,12 @@ export default class BrightnessRestorePreferences extends ExtensionPreferences {
         });
         contentToolbar.set_content(stack);
         contentToolbar.add_top_bar(contentHeader);
-        this._contentToastOverlay.set_child(contentToolbar);
-        splitViewContent.set_child(this._contentToastOverlay);
+        contentToastOverlay.set_child(contentToolbar);
+        splitViewContent.set_child(contentToastOverlay);
         splitView.set_content(splitViewContent);
 
-        this._firstPageAdded = false;
-        this._addPage = page => {
+        let firstPageAdded = false;
+        const addPage = page => {
             const row = new Gtk.ListBoxRow();
             row._name = page.get_name ? page.get_name() : 'page';
             row._title = page.get_title();
@@ -91,29 +111,47 @@ export default class BrightnessRestorePreferences extends ExtensionPreferences {
             box.append(rowLabel);
             row.set_child(box);
             row.set_activatable(true);
-            stack.add_named(page, row._id);
-            this._sidebarListBox.append(row);
 
-            if (!this._firstPageAdded) {
+            stack.add_named(page, row._id);
+            sidebarListBox.append(row);
+
+            if (!firstPageAdded) {
                 splitViewContent.set_title(row._title);
-                this._firstPageAdded = true;
+                firstPageAdded = true;
             }
         };
 
-        this._sidebarListBox.connect('row-activated', (listBox, row) => {
+        sidebarListBox.connect('row-activated', (listBox, row) => {
             if (!row) return;
             splitView.set_show_content(true);
             splitViewContent.set_title(row._title);
             stack.set_visible_child_name(row._id);
         });
+
+        // Return helper so strict mode doesn't complain
+        return addPage;
     }
 
     fillPreferencesWindow(window) {
         const settings = this.getSettings();
+        const signalHandlers = [];
+        const connectSignal = (obj, signal, handler) => {
+            const id = obj.connect(signal, handler);
+            signalHandlers.push([obj, id]);
+            return id;
+        };
+
+        window.connect('close-request', () => {
+            for (const [obj, id] of signalHandlers) {
+                if (obj) obj.disconnect(id);
+            }
+            signalHandlers.length = 0;
+            return false;
+        });
 
         // Setup custom sidebar layout
         window.set_default_size(900, 700);
-        this._switchToNavigationSplitViews(window);
+        const addPage = this._switchToNavigationSplitViews(window);
 
         // Helper to add icon to row
         const addIcon = (row, iconName) => {
@@ -172,6 +210,33 @@ export default class BrightnessRestorePreferences extends ExtensionPreferences {
             title: _('Panel Indicator'),
         });
 
+        // Indicator Style
+        const styleRow = new Adw.ActionRow({
+            title: _('Indicator Style'),
+            subtitle: _('System Indicator (Pill) or Standalone Panel Button'),
+        });
+        addIcon(styleRow, 'preferences-desktop-apps-symbolic');
+        const styleModel = Gtk.StringList.new([_('Standalone (Menu + Slider)'), _('Quick Settings (Integrated)')]);
+        const styleDropDown = new Gtk.DropDown({
+            valign: Gtk.Align.CENTER,
+            model: styleModel,
+        });
+
+        // Map string to index
+        // default is 'quick-settings' which matches index 1
+        const currentStyle = settings.get_string('indicator-style');
+        const styleMap = { 'standalone': 0, 'quick-settings': 1 };
+        styleDropDown.set_selected(styleMap[currentStyle] !== undefined ? styleMap[currentStyle] : 1);
+
+        styleDropDown.connect('notify::selected', widget => {
+            const idx = widget.get_selected();
+            const val = ['standalone', 'quick-settings'][idx];
+            settings.set_string('indicator-style', val);
+        });
+        styleRow.add_suffix(styleDropDown);
+        visualGroup.add(styleRow);
+
+        // Indicator Position (Conditional Visibility)
         const positionRow = new Adw.ActionRow({
             title: _('Indicator Position'),
             subtitle: _('Where to place the brightness percentage in Quick Settings'),
@@ -186,7 +251,7 @@ export default class BrightnessRestorePreferences extends ExtensionPreferences {
         // Map string to index
         const currentPos = settings.get_string('indicator-position');
         const map = { left: 0, right: 1, default: 2 };
-        positionDropDown.set_selected(map[currentPos] || 1);
+        positionDropDown.set_selected(map[currentPos] !== undefined ? map[currentPos] : 1);
 
         positionDropDown.connect('notify::selected', widget => {
             const idx = widget.get_selected();
@@ -196,7 +261,13 @@ export default class BrightnessRestorePreferences extends ExtensionPreferences {
         positionRow.add_suffix(positionDropDown);
         visualGroup.add(positionRow);
 
-        appearancePage.add(visualGroup);
+        // Visibility Logic: Only show Position if Style is 'Quick Settings'
+        const updatePositionVisibility = () => {
+            const style = settings.get_string('indicator-style');
+            positionRow.visible = style === 'quick-settings';
+        };
+        connectSignal(settings, 'changed::indicator-style', updatePositionVisibility);
+        updatePositionVisibility();
 
         // Manual Control Group
         const controlGroup = new Adw.PreferencesGroup({
@@ -248,7 +319,7 @@ export default class BrightnessRestorePreferences extends ExtensionPreferences {
         });
 
         // Listen for external updates (e.g. from extension)
-        settings.connect('changed::last-brightness', () => {
+        connectSignal(settings, 'changed::last-brightness', () => {
             const val = settings.get_double('last-brightness');
             // block signal? or just set_value. set_value triggers value-changed again?
             // Usually GtkScale guards, but let's be safe.
@@ -262,6 +333,7 @@ export default class BrightnessRestorePreferences extends ExtensionPreferences {
         sliderRow.add_suffix(scale);
         sliderRow.add_suffix(plusButton);
         controlGroup.add(sliderRow);
+        appearancePage.add(visualGroup);
         appearancePage.add(controlGroup);
 
         // === PAGE 3: DEBUG ===
@@ -334,8 +406,8 @@ export default class BrightnessRestorePreferences extends ExtensionPreferences {
             loggingGroup.visible = isDebug;
             logPathRow.visible = isDebug && settings.get_boolean('logtofile');
         };
-        settings.connect('changed::debug', updateDebugVisibility);
-        settings.connect('changed::logtofile', updateDebugVisibility);
+        connectSignal(settings, 'changed::debug', updateDebugVisibility);
+        connectSignal(settings, 'changed::logtofile', updateDebugVisibility);
         updateDebugVisibility();
 
         // === PAGE 4: CHANGELOG ===
@@ -378,7 +450,7 @@ export default class BrightnessRestorePreferences extends ExtensionPreferences {
             }
             projectGroup.set_description(_(descriptionText));
         };
-        settings.connect('changed::debug', updateAboutInfo);
+        connectSignal(settings, 'changed::debug', updateAboutInfo);
         updateAboutInfo();
 
         const linkRow = new Adw.ActionRow({
@@ -409,11 +481,10 @@ export default class BrightnessRestorePreferences extends ExtensionPreferences {
 
         aboutPage.add(projectGroup);
 
-        // Add pages to window
-        this._addPage(generalPage);
-        this._addPage(appearancePage);
-        this._addPage(debugPage);
-        this._addPage(changelogPage);
-        this._addPage(aboutPage);
+        addPage(generalPage);
+        addPage(appearancePage);
+        addPage(debugPage);
+        addPage(changelogPage);
+        addPage(aboutPage);
     }
 }

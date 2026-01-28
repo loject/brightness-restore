@@ -1,101 +1,116 @@
-import { getBatteryStatus } from './upower.js';
-import { isChargingState } from './utils.js';
+const INDICATOR_STYLES = new Set(['standalone', 'quick-settings']);
+const INDICATOR_POSITIONS = new Set(['left', 'right', 'default']);
 
 /**
- * Snapshot settings used by hot-path display logic.
+ * Normalize indicator style to a valid value.
  *
- * @param {object} settings - GSettings object
- * @returns {object} Snapshot of settings values
+ * @param {string} value - Raw setting value.
+ * @returns {string} Normalized style string.
+ */
+function normalizeIndicatorStyle(value) {
+    return INDICATOR_STYLES.has(value) ? value : 'quick-settings';
+}
+
+/**
+ * Normalize indicator position to a valid value.
+ *
+ * @param {string} value - Raw setting value.
+ * @returns {string} Normalized position string.
+ */
+function normalizeIndicatorPosition(value) {
+    return INDICATOR_POSITIONS.has(value) ? value : 'right';
+}
+
+/**
+ * Clamp brightness to 0..1 and preserve -1 sentinel.
+ *
+ * @param {number} value - Raw brightness value.
+ * @returns {number} Clamped brightness value.
+ */
+function clampBrightness(value) {
+    if (typeof value !== 'number' || Number.isNaN(value)) return -1;
+    if (value < 0) return -1;
+    return Math.max(0, Math.min(1, value));
+}
+
+/**
+ * Build a normalized settings snapshot for hot paths.
+ *
+ * @param {object} settings - GSettings object.
+ * @returns {object} Snapshot of normalized settings values.
  */
 export function getSettingsSnapshot(settings) {
-    const showPercentage = settings.get_boolean('percentage');
-    const showPercentageOutside = settings.get_boolean('showpercentageoutside') && showPercentage;
-    const showTimeRemaining = settings.get_boolean('timeremaining');
-    const showWatts = settings.get_boolean('showwatts');
-    const showIcon = settings.get_boolean('showicon');
-    const showCircle = settings.get_boolean('usecircleindicator');
-    const showColored = settings.get_boolean('showcolored');
-    const forceBolt = settings.get_boolean('forcebolt');
-    const hideCharging = settings.get_boolean('hidecharging');
-    const hideFull = settings.get_boolean('hidefull');
-    const hideIdle = settings.get_boolean('hideidle');
+    const indicatorStyle = normalizeIndicatorStyle(settings.get_string('indicator-style'));
+    const indicatorPosition = normalizeIndicatorPosition(settings.get_string('indicator-position'));
+    const lastBrightness = clampBrightness(settings.get_double('last-brightness'));
+    const restoreOnStartup = settings.get_boolean('restore-on-startup');
+    const debug = settings.get_boolean('debug');
+
     return {
-        showPercentage,
-        showPercentageOutside,
-        showPercentageText: showPercentageOutside,
-        showTimeRemaining,
-        showWatts,
-        showIcon,
-        showCircle,
-        showColored,
-        forceBolt,
-        hideCharging,
-        hideFull,
-        hideIdle,
-        showText: showPercentage && !showPercentageOutside,
+        indicatorStyle,
+        indicatorPosition,
+        lastBrightness,
+        restoreOnStartup,
+        debug,
     };
 }
 
 /**
- * Build indicator status used by drawing routines.
+ * Get normalized indicator style.
  *
- * @param {object} proxy - UPower proxy object
- * @param {object} settings - GSettings object
- * @returns {object} Status data for indicators
+ * @param {object} settings - GSettings object.
+ * @returns {string} Indicator style.
  */
-export function buildIndicatorStatus(proxy, settings) {
-    // Handle both GObject (snake_case) and DBus Proxy (PascalCase) properties
-    const rawPercentage = proxy.percentage ?? proxy.Percentage;
-    const percentage = Math.round(rawPercentage);
-    const status = getBatteryStatus();
-    const snapshot = getSettingsSnapshot(settings);
-
-    // proxy.state is a UPower.DeviceState enum
-    return {
-        percentage,
-        status,
-        isCharging: isChargingState(proxy, status) || snapshot.forceBolt,
-        showText: snapshot.showText,
-        useColor: snapshot.showColored,
-        forceBolt: snapshot.forceBolt,
-        hideCharging: snapshot.hideCharging,
-        hideFull: snapshot.hideFull,
-        hideIdle: snapshot.hideIdle,
-    };
-}
-
-// Default sizes
-const BATTERY_MIN_SIZE = 24;
-
-/**
- * Get circle size from settings.
- *
- * @param {object} settings - GSettings object
- * @returns {number} Size in pixels
- */
-export function getCircleSize(settings) {
-    const rawSize = settings.get_int('circlesize');
-    // User requested "sweet spot" limit: 25 to 50.
-    // < 25 is too small, > 50 doesn't grow (panel constraint) but adds width.
-    return Math.max(25, Math.min(rawSize, 50));
+export function getIndicatorStyle(settings) {
+    return normalizeIndicatorStyle(settings.get_string('indicator-style'));
 }
 
 /**
- * Get battery width from settings.
+ * Get normalized indicator position.
  *
- * @param {object} settings - GSettings object
- * @returns {number} Width in pixels
+ * @param {object} settings - GSettings object.
+ * @returns {string} Indicator position.
  */
-export function getBatteryWidth(settings) {
-    return settings.get_int('batterysize') || BATTERY_MIN_SIZE;
+export function getIndicatorPosition(settings) {
+    return normalizeIndicatorPosition(settings.get_string('indicator-position'));
 }
 
 /**
- * Get battery height from settings.
+ * Get last brightness value.
  *
- * @param {object} settings - GSettings object
- * @returns {number} Height in pixels
+ * @param {object} settings - GSettings object.
+ * @returns {number} Brightness value (0..1 or -1).
  */
-export function getBatteryHeight(settings) {
-    return settings.get_int('batteryheight') || BATTERY_MIN_SIZE;
+export function getLastBrightness(settings) {
+    return clampBrightness(settings.get_double('last-brightness'));
+}
+
+/**
+ * Set last brightness value.
+ *
+ * @param {object} settings - GSettings object.
+ * @param {number} value - Brightness value.
+ */
+export function setLastBrightness(settings, value) {
+    settings.set_double('last-brightness', clampBrightness(value));
+}
+
+/**
+ * Check if restore-on-startup is enabled.
+ *
+ * @param {object} settings - GSettings object.
+ * @returns {boolean} True if restore is enabled.
+ */
+export function isRestoreOnStartup(settings) {
+    return settings.get_boolean('restore-on-startup');
+}
+
+/**
+ * Check if debug logging is enabled.
+ *
+ * @param {object} settings - GSettings object.
+ * @returns {boolean} True if debug is enabled.
+ */
+export function isDebugEnabled(settings) {
+    return settings.get_boolean('debug');
 }

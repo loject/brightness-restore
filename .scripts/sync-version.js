@@ -10,24 +10,24 @@ const CHANGELOG_PATH = path.join(PROJECT_DIR, '.github', 'CHANGELOG.md');
 const README_PATH = path.join(PROJECT_DIR, '.github', 'README.md');
 
 try {
-    // 1. Read source of truth: package.json
+    // Read source of truth: package.json
     console.log('Reading package.json...');
     const pkg = require(PACKAGE_JSON_PATH);
     const newVersion = pkg.version.split('.')[0]; // Major version as the extension version
     console.log(`Detected version: ${newVersion}`);
 
-    // 2. Update VERSION file
+    // Update VERSION file
     console.log('Updating VERSION file...');
     fs.writeFileSync(VERSION_FILE_PATH, `${newVersion}\n`);
 
-    // 3. Update metadata.json
+    // Update metadata.json
     console.log('Updating extension/metadata.json...');
     const meta = require(METADATA_PATH);
     meta.version = parseInt(newVersion, 10);
     meta['version-name'] = newVersion;
     fs.writeFileSync(METADATA_PATH, `${JSON.stringify(meta, null, 2)}\n`);
 
-    // 4. Update prefs.js - Update BUILD_DATE constant + changelog
+    // Update prefs.js - Update BUILD_DATE constant + changelog
     console.log('Updating extension/prefs.js...');
     let prefsContent = fs.readFileSync(PREFS_PATH, 'utf8');
     const buildDate = new Date().toISOString();
@@ -78,7 +78,7 @@ ${entries.join('\n')}
                 let newContent = readmeContent.replace(regex, latestBlock);
                 const badgeRegex =
                     /\[!\[Version [^\]]+\]\(https:\/\/img\.shields\.io\/badge\/Version-[^-]+-green\.svg\)\]\([^)]+\)/;
-                const badge = `[![Version ${newVersion}](https://img.shields.io/badge/Version-${newVersion}-green.svg)](https://github.com/DarkPhilosophy/batt-watt-power-monitor)`;
+                const badge = `[![Version ${newVersion}](https://img.shields.io/badge/Version-${newVersion}-green.svg)](https://github.com/DarkPhilosophy/brightness-restore)`;
                 if (badgeRegex.test(newContent)) newContent = newContent.replace(badgeRegex, badge);
                 fs.writeFileSync(README_PATH, newContent);
                 console.log('✅ Updated README latest update block');

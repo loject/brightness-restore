@@ -27,15 +27,15 @@ It automatically saves your local brightness adjustments and restores them upon 
 <!-- LINT-RESULT-START -->
 ### Linting Status
 > **Status**: ✅ **Passing**  
-> **Last Updated**: 2026-01-26 22:16:42 UTC  
+> **Last Updated**: 2026-01-28 10:40:30 UTC  
 > **Summary**: 0 errors, 0 warnings
 
 <details>
 <summary>Click to view full lint output</summary>
 
 ```
-> brightness-restore@1.0.0 lint:fix
-> eslint --fix extension .scripts --format stylish
+> brightness-restore@2.0.0 lint
+> eslint extension .scripts --format stylish
 ```
 
 </details>
@@ -43,12 +43,22 @@ It automatically saves your local brightness adjustments and restores them upon 
 
 <!-- LATEST-VERSION-START -->
 <details open>
-<summary><strong>Latest Update (v1)</strong></summary>
+<summary><strong>Latest Update (v2)</strong></summary>
 
-- **Persistence**: Automatically remembers visual brightness level across reboots.
-- **Architecture**: Syncs directly with Gnome Shell's brightnessManager.
-- **UI**: Simple panel indicator with position control.
-- **Settings**: Refactored "Beautiful" settings menu with Debug/Logging capabilities.
+- **Dual UI Modes**:
+  - **Quick Settings (Default)**: Integrated seamlessly into the status area pill (no slider, clean look).
+  - **Standalone**: Classic panel button with slider menu for direct control.
+- **Hybrid Hardware/Software Control**:
+  - Prioritizes `org.gnome.SettingsDaemon.Power` (DBus) for hardware control.
+  - Automatically falls back to `Main.brightnessManager` (Software) if hardware is unavailable.
+- **Preferences Refinement**:
+  - Reordered settings for better usability.
+  - Conditional visibility for position settings based on selected style.
+- **Conditional Watchdog**:
+  - Background monitoring process now **only** runs when "Debug Mode" is enabled.
+- **Robustness**: Fixed linting issues and duplicate code paths.
+- **Cleanup**: Removed unused artifacts and legacy battery/power components.
+- **Refactor**: Split monolithic UI logic into focused indicator modules for maintainability.
 
 </details>
 <!-- LATEST-VERSION-END -->
@@ -60,7 +70,8 @@ You can configure the extension using standard Gnome Extensions settings (or `dc
 | Setting | Default | Description |
 | :--- | :--- | :--- |
 | **Restore on Startup** | `true` | Whether to restore the saved value on login. |
-| **Indicator Position** | `right` | `left`, `right`, or `default`. |
+| **Indicator Style** | `quick-settings` | `standalone` (Panel Button) or `quick-settings` (Pill). |
+| **Indicator Position** | `right` | `left`, `right`, or `default` (Only for Quick Settings). |
 | **Interval** | `2` | Internal update interval (debounced save). |
 
 ## Install

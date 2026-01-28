@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <schemalist gettext-domain="brightness-restore">
+  <enum id="org.gnome.shell.extensions.brightness-restore.IndicatorStyle">
+    <value value="0" nick="standalone"/>
+    <value value="1" nick="quick-settings"/>
+  </enum>
+
   <schema id="org.gnome.shell.extensions.brightness-restore" path="/org/gnome/shell/extensions/brightness-restore/">
     <key name="last-brightness" type="d">
       <default>-1.0</default>
@@ -8,21 +13,24 @@
     </key>
     <key name="restore-on-startup" type="b">
       <default>true</default>
-      <summary>Restore brightness on login</summary>
-      <description>Whether to apply the last saved brightness when the extension loads.</description>
+      <summary>Restore brightness on startup</summary>
+      <description>If true, restores the last saved brightness value on login</description>
     </key>
     <key name="indicator-position" type="s">
       <default>'right'</default>
-      <summary>Indicator Position</summary>
-      <description>Where to place the indicator: 'left', 'right', or 'default'.</description>
+      <summary>Indicator Position (Quick Settings)</summary>
+      <description>Position of the indicator in Quick Settings (left, right, default)</description>
     </key>
     <key name="interval" type="i">
       <default>2</default>
       <summary>Update interval</summary>
+      <description>Interval in seconds to check for brightness changes</description>
     </key>
+
     <key name="debug" type="b">
       <default>false</default>
-      <summary>Enable Debug Mode</summary>
+      <summary>Debug</summary>
+      <description>Enable debug logging</description>
     </key>
     <key name="loglevel" type="i">
       <default>1</default>
@@ -36,6 +44,11 @@
     <key name="logfilepath" type="s">
       <default>''</default>
       <summary>Log File Path</summary>
+    </key>
+    <key name="indicator-style" enum="org.gnome.shell.extensions.brightness-restore.IndicatorStyle">
+      <default>'quick-settings'</default>
+      <summary>Indicator Style</summary>
+      <description>Choose between Standalone Panel Button or Quick Settings Integration</description>
     </key>
   </schema>
 </schemalist>

@@ -1,4 +1,4 @@
-# Contributing to Battery Power Monitor
+# Contributing to Brightness Restore
 
 Thanks for considering a contribution.
 
@@ -22,12 +22,11 @@ This project follows the [Contributor Covenant](https://www.contributor-covenant
 
 ## Development Setup
 
-### Project Structure (v18+)
+### Project Structure
 
 - **extension/**: Contains the extension source.
-  - **extension.js**: Main entry point (enable/disable/unlock).
+  - **extension.js**: Main entry point.
   - **prefs.js**: Preferences window logic.
-  - **library/**: Core logic modules (`drawing`, `sync`, `system`, etc.).
   - **schemas/**: GSettings schemas.
 - **.scripts/**: Build and maintenance tooling.
 - **.github/**: Documentation and workflows.
@@ -42,8 +41,8 @@ This project follows the [Contributor Covenant](https://www.contributor-covenant
 ### Setup
 
 ```bash
-git clone https://github.com/DarkPhilosophy/batt-watt-power-monitor.git
-cd batt-watt-power-monitor
+git clone https://github.com/DarkPhilosophy/brightness-restore.git
+cd brightness-restore
 npm install  # Installs ESLint 9+ and dependencies
 ./build.sh   # Builds, lints, and installs locally
 ```
